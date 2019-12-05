@@ -1,36 +1,65 @@
 // SVM client
 import java.net.*; 
 import java.io.*; 
+import java.sql.Timestamp;
 
 public class Client 
 { 
     private Socket socket        = null; 
     private DataInputStream input = null; 
     private DataOutputStream out     = null; 
-    private BufferedReader in = null; 
+    private DataInputStream in = null; 
     private String serverResponse = null;
 
-    public void commit(String filename) {
-        // int count;
-        // byte[] buffer = new byte[8192]; // or 4096, or more
-        // while ((count = in.read(buffer)) > 0)
-        // {
-        //   out.write(buffer, 0, count);
-        // }
-        byte [] bytearray = null;
+    public void commit() {
         try {
-            File file = new File ("workingDir/" + filename);
-            bytearray  = new byte [(int)file.length()];
-            //FileInputStream fis = new FileInputStream(file);
-            //BufferedInputStream bis = new BufferedInputStream(fis);
-            FileInputStream in = new FileInputStream("workingDir/" + filename);
-            in.read(bytearray,0,bytearray.length);
-            out.write(bytearray,0,bytearray.length);
-            System.out.println("Sending " + filename + " (" + bytearray.length + " bytes) to server...");
+            System.out.print("Filename: "); 
+            String filename = input.readLine(); 
+            byte [] bytearray = null;
+            File filecheck = new File("workingDir/" + filename);
+            if(filecheck.exists()) { 
+                out.writeUTF("commit");
+                
+                out.writeUTF(filename);
+                File file = new File ("workingDir/" + filename);
+                bytearray  = new byte [(int)file.length()];
+                //FileInputStream fis = new FileInputStream(file);
+                //BufferedInputStream bis = new BufferedInputStream(fis);
+                FileInputStream in = new FileInputStream("workingDir/" + filename);
+                in.read(bytearray,0,bytearray.length);
+                out.write(bytearray,0,bytearray.length);
+                System.out.println("Sending " + filename + " (" + bytearray.length + " bytes) to server...");
+                System.out.println("Done.");
+            } else {
+                System.out.println("NOT FOUND file " + filename + " in working directory");
+            }
+        } catch(IOException io) { 
+            System.out.println(io); 
+        }
+    }
+
+    public void checkout(String filename, String timestamp) {
+        try { 
+            out.writeUTF(filename);
+            out.writeUTF(timestamp);
+            out.flush();
+            String found = in.readUTF();
+            //checkout file
+            if(found.equals("false")) {
+                System.out.println("File " + filename + " with timestamp " + timestamp + " not found...");
+            } else {
+                byte [] bytearray  = new byte [2048];   
+                int bytesRead = in.read(bytearray,0,bytearray.length);
+                System.out.println("Receiving " + filename + " (" + bytesRead + " bytes) from server...");
+                FileOutputStream outFile = new FileOutputStream("workingDir"+"/"+filename);
+                outFile.write(bytearray,0,bytesRead);
+                outFile.close();
+                System.out.println("File " + filename + " with timestamp " + timestamp + " checked out.");
+            }
+            System.out.println("Done.");
         } catch(IOException i) { 
             System.out.println(i); 
         } 
-        System.out.println("Done.");
     }
 
     public Client(String address, int port) 
@@ -45,11 +74,7 @@ public class Client
 
             // takes input from terminal 
             input = new DataInputStream(System.in); 
-            //in = new DataInputStream( 
-            //    new BufferedInputStream(socket.getInputStream()));
-            in = new BufferedReader(
-                new InputStreamReader(socket.getInputStream()));
-
+            in = new DataInputStream(socket.getInputStream());
             // sends output to the socket 
             out = new DataOutputStream(socket.getOutputStream()); 
         } 
@@ -74,14 +99,15 @@ public class Client
                 line = input.readLine(); 
 
                 String arg[] = line.split(" ");
-                if(arg[0].equals("commit")) {
-                    out.writeUTF("commit");
-                    System.out.print("Filename: "); 
-                    line = input.readLine(); 
-                    out.writeUTF(line);
-                    commit(line);
+                if(arg[0].equals("commit")) {                    
+                    commit();
                 } else if(arg[0].equals("checkout")) {
-                    //out.writeUTF(checkout(arg[1], arg[2]));
+                    out.writeUTF("checkout");
+                    System.out.print("Filename: ");
+                    String filename = input.readLine();
+                    System.out.print("Timestamp [yyy-mm-dd hh:mm:ss.sss]: ");
+                    String timestamp = input.readLine();
+                    checkout(filename, timestamp);
                 } else if(arg[0].equals("update")) {
                     //out.writeUTF(update(arg[1]));
                 } else if(arg[0].equals("exit")) {
@@ -102,7 +128,7 @@ public class Client
         try
         { 
             out.writeUTF("exit");
-            //in.close();
+            in.close();
             input.close(); 
             out.close(); 
             socket.close(); 
