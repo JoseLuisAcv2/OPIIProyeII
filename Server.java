@@ -89,6 +89,29 @@ public class Server
         System.out.println("Done.");
     }
 
+    public void update() {
+    	try {
+    		String filename = in.readUTF();
+			System.out.println("Searching file " + filename + "...");
+    		String fullFilename = searchFileUpdated(filename);
+    		if(fullFilename == null) {
+    			out.writeUTF("false");
+    			out.flush();
+    			System.out.println("NOT FOUND " + filename + ".");
+    		} else {
+    			out.flush();
+    			out.writeUTF("true");
+    			byte [] bytearray = searchFile(fullFilename, "");
+    			out.write(bytearray,0,bytearray.length);
+    			out.flush();
+    			System.out.println("Sending file " + filename + "...");
+    		}
+		} catch(IOException i) { 
+            System.out.println(i); 
+        } 
+        System.out.println("Done.");
+    }
+
     private byte[] searchFile(String filename, String timestamp) {
     	for(int i = 1; i < SERVER_NUM; i++) {
 			try {
@@ -113,6 +136,37 @@ public class Server
     	return null;
     }
 
+    private String searchFileUpdated(String filename) {
+    	String foundTimestamp = null;
+    	String foundFilename = null;
+    	int foundServerId = 0;
+    	for(int i = 1; i < SERVER_NUM; i++) {
+			try {
+				System.out.println("Asking server with ID " + Integer.toString(i) + "...");
+				outConn[i].writeUTF("getUpdated");
+				outConn[i].writeUTF(filename);
+				outConn[i].flush();
+				// get response
+				String found = inConn[i].readUTF();
+				if(found.equals("true")) {
+					String currentTimestamp = inConn[i].readUTF();
+					String currentFilename = inConn[i].readUTF();
+					if (foundTimestamp == null || Long.parseLong(foundTimestamp) < Long.parseLong(currentTimestamp)) {
+						foundTimestamp = currentTimestamp;
+						foundFilename = currentFilename;
+						foundServerId = i;
+					}
+				}
+			} catch(UnknownHostException u) { 
+	           System.out.println(u); 
+	        } catch(IOException io) { 
+	           System.out.println(io); 
+	        }
+		}
+		System.out.println("Found updated file " + filename + " found in server " + Integer.toString(foundServerId) + "...");
+    	return foundFilename;
+    }
+
     public void getFile() {
     	try {
 			String filename = in.readUTF();
@@ -126,6 +180,38 @@ public class Server
 	        	out.write(bytearray,0,bytearray.length);
 			} else {
 				out.writeUTF("false");
+			}
+			out.flush();
+			System.out.println("Done.");
+       	} catch(IOException io) { 
+	      	System.out.println(io); 
+	  	}
+    }
+
+    public void getFileUpdated() {
+    	try {
+			String filename = in.readUTF();
+			File dir = new File("storageServer" + Integer.toString(serverID));
+			File[] foundFiles = dir.listFiles(new FilenameFilter() {
+			    public boolean accept(File dir, String name) {
+			        return name.startsWith(filename);
+			    }
+			});
+			if(foundFiles.length == 0) {
+				out.writeUTF("false");
+			} else {
+				out.writeUTF("true");
+				String latestTimestamp = null;
+				String latestFilename = null;
+				for (File file : foundFiles) {
+			    	String currentTimestamp = Long.toString(file.lastModified());
+			    	if (latestTimestamp == null || Long.parseLong(latestTimestamp) < Long.parseLong(currentTimestamp)) {
+						latestTimestamp = currentTimestamp;
+						latestFilename = file.getName();
+					}
+				}
+				out.writeUTF(latestTimestamp);
+				out.writeUTF(latestFilename);
 			}
 			out.flush();
 			System.out.println("Done.");
@@ -190,7 +276,7 @@ public class Server
 						} else if(arg[0].equals("checkout")) {
 							checkout();
 						} else if(arg[0].equals("update")) {
-							System.out.println("update");
+							update();
 						} else if(arg[0].equals("exit")) {
 							break;
 						} else {
@@ -254,10 +340,9 @@ public class Server
 						} else if(arg[0].equals("get")) {
 							System.out.println("Get request.");
 							getFile();
-						} else if(arg[0].equals("update")) {
-							
+						} else if(arg[0].equals("getUpdated")) {
+							getFileUpdated();
 						}
-
 					} 
 					catch(IOException i) 
 					{ 

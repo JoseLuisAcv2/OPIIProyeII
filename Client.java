@@ -19,7 +19,6 @@ public class Client
             File filecheck = new File("workingDir/" + filename);
             if(filecheck.exists()) { 
                 out.writeUTF("commit");
-                
                 out.writeUTF(filename);
                 File file = new File ("workingDir/" + filename);
                 bytearray  = new byte [(int)file.length()];
@@ -50,11 +49,38 @@ public class Client
             } else {
                 byte [] bytearray  = new byte [2048];   
                 int bytesRead = in.read(bytearray,0,bytearray.length);
-                System.out.println("Receiving " + filename + " (" + bytesRead + " bytes) from server...");
+                System.out.println("Checking out " + filename + " (" + bytesRead + " bytes) from server...");
                 FileOutputStream outFile = new FileOutputStream("workingDir"+"/"+filename);
                 outFile.write(bytearray,0,bytesRead);
                 outFile.close();
                 System.out.println("File " + filename + " with timestamp " + timestamp + " checked out.");
+            }
+            System.out.println("Done.");
+        } catch(IOException i) { 
+            System.out.println(i); 
+        } 
+    }
+
+    public void update() {
+        try { 
+            System.out.print("Filename: "); 
+            String filename = input.readLine();
+            out.writeUTF("update");
+            out.writeUTF(filename);
+            out.flush();
+            String found = in.readUTF();
+            //checkout file
+            if(found.equals("false")) {
+                System.out.println("File " + filename + " not found...");
+            } else {
+                System.out.println("Updating file " + filename + "...");
+                byte [] bytearray  = new byte [2048];   
+                int bytesRead = in.read(bytearray,0,bytearray.length);
+                System.out.println("Updating to last revision of file " + filename + " (" + bytesRead + " bytes) from server...");
+                FileOutputStream outFile = new FileOutputStream("workingDir"+"/"+filename);
+                outFile.write(bytearray,0,bytesRead);
+                outFile.close();
+                System.out.println("File " + filename + " updated.");
             }
             System.out.println("Done.");
         } catch(IOException i) { 
@@ -109,7 +135,7 @@ public class Client
                     String timestamp = input.readLine();
                     checkout(filename, timestamp);
                 } else if(arg[0].equals("update")) {
-                    //out.writeUTF(update(arg[1]));
+                    update();
                 } else if(arg[0].equals("exit")) {
                     break;
                 } else {
